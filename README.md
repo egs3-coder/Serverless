@@ -5,7 +5,9 @@ Atividade individual 1 (Serverless) · Infraestrutura de Software · ADS · CESA
 Função HTTP serverless que **recebe uma requisição de bolsas de sangue do Rota Vital e devolve a guia de transporte**.
 Rodada localmente com o **AWS SAM CLI** (emulador do AWS Lambda + API Gateway em Docker).
 
-- **Caminho escolhido:** Caminho A (recomendado) – AWS SAM CLI local, sem conta na AWS e sem cartão.
+- **Caminho escolhido:** Caminho A (recomendado) – AWS SAM CLI com emulação local, sem conta na AWS e sem cartão.
+- **Onde rodei:** no **Google Cloud Shell** (terminal Linux gratuito no navegador, que já tem Docker e Python),
+  instalando o SAM CLI com `pip install aws-sam-cli`. Os mesmos comandos funcionam com Docker Desktop no próprio PC.
 - **Provedor emulado:** AWS (Lambda + API Gateway).
 - **Linguagem:** Python 3.12.
 - **Vídeo:** `COLE AQUI O LINK DO VÍDEO`
@@ -66,6 +68,9 @@ Também tratei o caso de body inválido devolvendo `400` em vez de deixar a fun�
 ## 3. Como rodar (passo a passo)
 
 > **Windows:** rode todos os comandos no **Git Bash** (ou WSL), como pede o enunciado.
+>
+> **Sem instalar nada:** abra https://shell.cloud.google.com (com um Gmail pessoal), rode
+> `pip install aws-sam-cli` e use `sam build --use-container` no lugar de `sam build`.
 
 ### Passo 1 – Instalar as ferramentas
 
@@ -120,8 +125,11 @@ no fim, o tempo `real` do comando.
 
 | Invocação | Tempo `real` | `Duration` (REPORT) | `Init Duration` |
 |---|---|---|---|
-| 1ª | `___ s` | `___ ms` | `___ ms` |
-| 2ª | `___ s` | `___ ms` | `___ ms` |
+| 1ª | 3,573 s | 73,04 ms | 0,09 ms |
+| 2ª | 3,973 s | 70,91 ms | 0,05 ms |
+
+As duas responderam `201` com a guia `G-R-001`. A linha `[ERROR] ... LAMBDA_RUNTIME Failed to get next invocation`
+que aparece no fim é o runtime reclamando depois que o SAM já desligou o container; não afeta a resposta.
 
 ### Passo 4 – Acionar por HTTP
 
@@ -150,8 +158,8 @@ E repita as três chamadas.
 
 | Modo | `invocacaoNesteAmbiente` nas 3 chamadas |
 |---|---|
-| `sam local start-api` | `__, __, __` |
-| `sam local start-api --warm-containers LAZY` | `__, __, __` |
+| `sam local start-api` | **1, 1, 1** (1,49 s · 0,87 s · 0,83 s) |
+| `sam local start-api --warm-containers LAZY` | **1, 2, 3** (1,08 s · 0,038 s · 0,037 s) |
 
 ### Passo 5 – Bater no limite de tempo
 
@@ -164,8 +172,11 @@ curl -X POST http://127.0.0.1:3000/guias -H "Content-Type: application/json" \
 
 Ou por evento: `sam local invoke -e events/pedido_demorar.json`
 
-**Erro registrado:** `COLE AQUI O ERRO` (no terminal do SAM aparece algo como
-`Function 'GuiaTransporteFunction' timed out after 3 seconds` e o curl recebe um erro `502`).
+**Erro registrado:** o curl recebeu `{"message":"Internal server error"}` com **HTTP 502 em 3,14 s**, e o
+terminal do SAM mostrou `Function 'GuiaTransporteFunction' timed out after 3 seconds`
+(`REPORT ... Duration: 3000.00 ms  Billed Duration: 3000 ms`).
+
+**Depois do ajuste para 10 s:** a mesma chamada voltou **HTTP 201** com a guia `G-R-003` em **5,04 s**.
 
 Ajuste: no `template.yaml`, em `Globals > Function`, trocar `Timeout: 3` por `Timeout: 10`, e então:
 
@@ -195,8 +206,10 @@ Firecracker; no SAM local um container Docker), inicializa o runtime do Python e
 **Invoke**, que roda o `lambda_handler`. Na segunda chamada, parte desse trabalho já está feito
 (imagem do Docker já baixada/em cache, ambiente quente), então ela é mais rápida.
 
-No meu teste: 1ª = `___ s`, 2ª = `___ s`. *(Observação: com `sam local invoke` cada execução cria um
-container novo, então a maior diferença local vem da primeira vez em que o SAM prepara a imagem do runtime.)*
+No meu teste, o efeito apareceu com mais clareza no `start-api --warm-containers LAZY`: a 1ª chamada
+levou **1,08 s** (cold start: criar o container e rodar o Init) e as seguintes **~0,04 s** (warm: ambiente
+reaproveitado, só a fase de Invoke). Com `sam local invoke` as duas execuções ficaram parecidas
+(3,57 s e 3,97 s) porque esse comando cria um container novo **a cada** invocação — as duas são cold.
 
 ### 2. O que o campo `invocacaoNesteAmbiente` mostrou com e sem `--warm-containers`? O que isso diz sobre guardar estado numa variável global?
 
