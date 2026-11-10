@@ -1,0 +1,36 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Rota Vital - função serverless que gera a guia de transporte de uma
+  requisição de bolsas de sangue (Atividade individual 1 - Serverless).
+
+Globals:
+  Function:
+    # Limite de tempo de execução. Com 3 s, a chamada com "demorar": true
+    # (que dorme 5 s) estoura. No Passo 5, troque para 10 e rode sam build.
+    Timeout: 3
+    MemorySize: 128
+
+Resources:
+  GuiaTransporteFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: guia_transporte/
+      Handler: app.lambda_handler
+      Runtime: python3.12
+      Architectures:
+        - x86_64
+      Events:
+        CriarGuia:
+          Type: Api
+          Properties:
+            Path: /guias
+            Method: post
+
+Outputs:
+  GuiasApi:
+    Description: URL da API (só existe se publicar na nuvem com sam deploy)
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/guias"
+  GuiaTransporteFunction:
+    Description: ARN da função
+    Value: !GetAtt GuiaTransporteFunction.Arn
