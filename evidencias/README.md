@@ -4,7 +4,7 @@ Coloque aqui os prints (PNG/JPG) de cada etapa. Use estes nomes para o professor
 
 | Arquivo | O que o print precisa mostrar |
 |---|---|
-| `01-versoes.png` *(pendente)* | `sam --version`, `docker --version` e `python3 --version` |
+| `01-versoes.png` | `sam --version`, `docker --version` e `python3 --version` |
 | `02-sam-build.png` | Saída de `sam build` terminando em **Build Succeeded** |
 | `03-04-invoke.png` | Duas execuções de `time sam local invoke -e events/pedido.json` (201 + `REPORT` + tempo `real`) |
 | `05-start-api.png` | Terminal com `sam local start-api` mostrando `Mounting GuiaTransporteFunction at http://127.0.0.1:3000/guias [POST]` |
