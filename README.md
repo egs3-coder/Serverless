@@ -10,7 +10,8 @@ Rodada localmente com o **AWS SAM CLI** (emulador do AWS Lambda + API Gateway em
   instalando o SAM CLI com `pip install aws-sam-cli`. Os mesmos comandos funcionam com Docker Desktop no próprio PC.
 - **Provedor emulado:** AWS (Lambda + API Gateway).
 - **Linguagem:** Python 3.12.
-- **Vídeo:** `COLE AQUI O LINK DO VÍDEO`
+- **Vídeo (2min55s):** [`video/Serverless_RotaVital_video_legendado.mp4`](video/Serverless_RotaVital_video_legendado.mp4)
+  (clique em *View raw* para baixar e assistir). Link no YouTube: `COLE AQUI O LINK DO YOUTUBE (opcional)`
 
 ---
 
@@ -29,6 +30,7 @@ Serverless/
 ├── scripts/chamadas.sh        # Faz as 3 chamadas curl do Passo 4
 ├── tests/test_app.py          # Testes unitários do handler (pytest, sem Docker)
 ├── evidencias/                # Prints dos comandos e saídas
+├── video/                     # Vídeo da atividade (até 3 min)
 └── ROTEIRO_VIDEO.md           # Roteiro do vídeo de 3 minutos
 ```
 
@@ -277,21 +279,64 @@ servidor ligado.
 
 ## 5. Evidências
 
-Os prints estão na pasta [`evidencias/`](evidencias/) (a lista do que cada print mostra está em
-[`evidencias/README.md`](evidencias/README.md)).
+Prints tirados no Google Cloud Shell, na pasta [`evidencias/`](evidencias/)
+(descrição de cada um em [`evidencias/README.md`](evidencias/README.md)).
+
+**Passo 1 – ferramentas instaladas** (SAM CLI 1.171.0, Docker 29.9.3, Python 3.12.3)
+
+![versões](evidencias/01-versoes.png)
+
+**Passo 2 – `sam build --use-container`** (Build Succeeded)
+
+![build](evidencias/02-sam-build.png)
+
+**Passo 3 – duas invocações com evento** (`statusCode: 201`, linha `REPORT` e tempo `real` de cada uma)
+
+![invoke](evidencias/03-04-invoke.png)
+
+**Passo 4 – `sam local start-api`** (rota `POST /guias`)
+
+![start-api](evidencias/05-start-api.png)
+
+**Passo 4 – 3 chamadas curl sem `--warm-containers`** (contador 1, 1, 1)
+
+![sem warm](evidencias/06-curl-sem-warm.png)
+
+**Passo 4 – 3 chamadas curl com `--warm-containers LAZY`** (contador 1, 2, 3)
+
+![lazy](evidencias/07-curl-warm-lazy.png)
+
+**Passo 5 – `"demorar": true` com Timeout 3 s** (HTTP 502 em 3,14 s)
+
+![timeout cliente](evidencias/08a-timeout-3s.png)
+
+**Passo 5 – log do SAM** (`timed out after 3 seconds`, `Duration: 3000.00 ms`)
+
+![timeout servidor](evidencias/08b-timeout-servidor.png)
+
+**Passo 5 – depois do ajuste para `Timeout: 10`** (HTTP 201 em 5,04 s)
+
+![timeout 10](evidencias/09-timeout-10s.png)
 
 ## 6. Uso de IA
 
 Declaração conforme a PO-CESAR-021.
 
 - **Ferramenta:** Claude (Anthropic).
-- **Finalidade:** ajudar a montar a estrutura do projeto SAM, ajustar o handler para ler o body em base64
-  (gerado pelo `sam local generate-event` nas versões novas do SAM CLI), escrever os testes unitários e
-  organizar o README e o roteiro do vídeo.
-- **Como validei:** rodei eu mesmo todos os comandos dos Passos 2 a 5 na minha máquina (prints em
-  `evidencias/`), conferi as respostas da função e os tempos, rodei `python -m pytest` (5 testes passando)
-  e `sam validate --lint`, refiz a conta de custo à mão e revisei/reescrevi as respostas com as minhas
-  palavras com base no material da Aula 007 e na documentação da AWS.
+- **Finalidade:**
+  - montar a estrutura do projeto SAM (`template.yaml`, eventos, script de chamadas) e ajustar o handler
+    para ler o body em base64, que o `sam local generate-event` gera nas versões novas do SAM CLI;
+  - escrever os testes unitários;
+  - redigir o README (passo a passo e rascunho das respostas);
+  - me orientar passo a passo na execução pelo Google Cloud Shell;
+  - montar o vídeo a partir dos meus prints, com legendas explicativas.
+- **Como validei:**
+  - executei eu mesmo, no Google Cloud Shell, todos os comandos dos Passos 1 a 5 (prints em `evidencias/`);
+  - conferi as respostas da função, os tempos e o comportamento do contador e do timeout;
+  - rodei `python -m pytest` (5 testes passando) e `sam validate --lint`;
+  - refiz a conta de custo à mão;
+  - revisei as respostas com base no material da Aula 007 e na documentação da AWS.
+  Os números do README e do vídeo são os das minhas execuções.
 
 ## 7. Referências
 
