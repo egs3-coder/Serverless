@@ -201,79 +201,78 @@ python -m pytest -q
 
 ### 1. Por que a primeira invocação demorou mais que a segunda? O que acontece na fase de Init?
 
-A primeira invocação pega o **cold start**: não existe ainda um ambiente pronto, então a plataforma precisa
-criar um. Na fase de **Init** o Lambda baixa o código, sobe o ambiente de execução (na nuvem uma microVM
-Firecracker; no SAM local um container Docker), inicializa o runtime do Python e executa tudo o que está
-**fora** do handler (imports e variáveis globais, como o `contador = 0`). Só depois disso vem a fase de
-**Invoke**, que roda o `lambda_handler`. Na segunda chamada, parte desse trabalho já está feito
-(imagem do Docker já baixada/em cache, ambiente quente), então ela é mais rápida.
+A primeira invocação é mais lenta porque ocorre o cold start. Essa preparação é a fase de Init: a plataforma
+cria o ambiente, carrega o código, inicializa o Python e executa os imports e variáveis globais antes do handler.
 
-No meu teste, o efeito apareceu com mais clareza no `start-api --warm-containers LAZY`: a 1ª chamada
-levou **1,08 s** (cold start: criar o container e rodar o Init) e as seguintes **~0,04 s** (warm: ambiente
-reaproveitado, só a fase de Invoke). Com `sam local invoke` as duas execuções ficaram parecidas
-(3,57 s e 3,97 s) porque esse comando cria um container novo **a cada** invocação — as duas são cold.
+Nas chamadas seguintes, o ambiente já está quente e é reutilizado, tornando-as mais rápidas. No teste com
+`start-api --warm-containers LAZY`, a primeira chamada demorou 1,08 s e as seguintes cerca de 0,04 s. Já com
+`sam local invoke`, cada execução cria um novo container, por isso ambas tiveram tempos semelhantes
+(3,57 s e 3,97 s).
 
 ### 2. O que o campo `invocacaoNesteAmbiente` mostrou com e sem `--warm-containers`? O que isso diz sobre guardar estado numa variável global?
 
-- **Sem** `--warm-containers`: deu sempre **1**, porque o SAM cria um container novo a cada requisição,
-  então o `contador` sempre recomeça do zero.
-- **Com** `--warm-containers LAZY`: deu **1, 2, 3**, porque o mesmo container foi reaproveitado e a
-  variável global continuou na memória entre as chamadas.
+Sem `--warm-containers`, o resultado foi sempre `1`, porque cada requisição criava um novo container e
+reiniciava o contador.
 
-Conclusão: variável global **não é um lugar confiável para guardar estado**. Ela só sobrevive se a
-plataforma decidir reaproveitar o ambiente, o que não é garantido (o ambiente pode ser destruído a qualquer
-momento, e com várias requisições simultâneas cada uma pode cair em um ambiente diferente, cada um com seu
-próprio contador). Estado de verdade (ex.: número de guias emitidas) tem que ir para um armazenamento
-externo, como DynamoDB, um banco relacional ou Redis. A global serve bem para **cache**, por exemplo uma
-conexão de banco criada no Init e reaproveitada nas chamadas quentes.
+Com `--warm-containers LAZY`, os valores foram `1, 2, 3`, pois o mesmo container foi reutilizado e manteve a
+variável global na memória.
+
+Mesmo assim, variáveis globais não são confiáveis para armazenar dados permanentes: o ambiente pode ser
+encerrado, e requisições simultâneas podem usar containers diferentes. Para informações importantes, como a
+quantidade de guias emitidas, é melhor usar um armazenamento externo, como DynamoDB, um banco de dados
+relacional ou Redis. Variáveis globais são mais adequadas para caches, como uma conexão com o banco de dados.
 
 ### 3. O que aconteceu com `demorar = true`? Qual o tempo máximo de uma execução no Lambda, e o que fazer com um trabalho mais longo?
 
-Com `Timeout: 3`, a função dormiu 5 s e foi **interrompida pela plataforma aos 3 s**
-(`timed out after 3 seconds`); a guia não foi devolvida e o cliente recebeu erro. Depois de subir o
-`Timeout` para 10 e refazer o `sam build`, a mesma chamada respondeu 201 depois de uns 5 s.
+Com `Timeout: 3`, a função precisava de 5 segundos, mas foi interrompida aos 3. O `curl` recebeu o erro
+HTTP `502 – Internal server error`, e o log do SAM mostrou: `timed out after 3 seconds`. Por isso, a guia não
+foi emitida. Após aumentar o limite para 10 segundos e executar o `sam build` novamente, a chamada respondeu
+`201` depois de aproximadamente 5 segundos.
 
-O tempo máximo de uma execução no AWS Lambda é **900 segundos (15 minutos)**. Para trabalhos mais longos:
-dividir em etapas menores e orquestrar com **AWS Step Functions**; processar de forma assíncrona com uma
-fila (**SQS**) em vários pedaços; ou levar o trabalho para um serviço sem esse limite, como um container
-no **ECS/Fargate** ou o **AWS Batch**.
+O AWS Lambda permite execuções de até 15 minutos. Para tarefas mais longas, pode-se dividi-las em etapas,
+usar Step Functions ou SQS, ou recorrer a serviços como ECS/Fargate e AWS Batch.
 
 ### 4. Quanto custam 1 milhão de execuções com 128 MB e 100 ms?
 
-Preços de us-east-1: US$ 0,20 por milhão de requisições e US$ 0,0000166667 por GB-s.
+Na região `us-east-1`, o custo estimado para 1 milhão de execuções é:
 
 **Requisições:**
-1.000.000 × (US$ 0,20 / 1.000.000) = **US$ 0,20**
+`1.000.000 × (US$ 0,20 ÷ 1.000.000) = US$ 0,20`
 
-**Computação (GB-s):**
-- Memória: 128 MB = 128 / 1024 = **0,125 GB**
-- Duração: 100 ms = **0,1 s**
-- Por execução: 0,125 GB × 0,1 s = **0,0125 GB-s**
-- 1 milhão de execuções: 0,0125 × 1.000.000 = **12.500 GB-s**
-- Custo: 12.500 × US$ 0,0000166667 = **≈ US$ 0,2083**
+**Computação:**
 
-**Total ≈ US$ 0,20 + US$ 0,21 = US$ 0,41** por milhão de execuções.
+- Memória: `128 MB ÷ 1024 = 0,125 GB`
+- Por execução: `0,125 GB × 0,1 s = 0,0125 GB-s`
+- 1 milhão de execuções: `0,0125 × 1.000.000 = 12.500 GB-s`
+- Custo: `12.500 × US$ 0,0000166667 ≈ US$ 0,21`
 
-(Dentro da faixa sempre gratuita — 1 milhão de requisições e 400 mil GB-s por mês — esse volume sairia
-de graça.)
+O GB-s combina a memória usada pela função com o tempo de execução: é a quantidade de GB multiplicada pelo
+número de segundos.
+
+**Custo total:**
+`US$ 0,20 + US$ 0,21 ≈ US$ 0,41`
+
+Como esse volume está dentro da faixa sempre gratuita do AWS Lambda — 1 milhão de requisições e 400 mil GB-s
+por mês — o custo seria zero.
 
 ### 5. Em que parte do Rota Vital uma função assim faria sentido, e em qual não faria?
 
-**Faz sentido:** em tarefas curtas, sem estado e disparadas por evento, que acontecem de forma irregular:
-- gerar a **guia de transporte** quando um hospital faz uma requisição (este exemplo);
-- enviar **notificação** (e-mail/SMS/push) quando o status da entrega muda;
-- gerar o **PDF/QR Code** da guia;
-- receber **webhooks** de parceiros ou validar um pedido antes de gravá-lo.
-Nessas partes o volume varia muito ao longo do dia, e pagar só por execução sai mais barato que manter um
-servidor ligado.
+O AWS Lambda faz sentido no Rota Vital para tarefas curtas, sem estado e acionadas por eventos, como:
 
-**Não faz sentido:**
-- **rastreamento em tempo real** do veículo com conexão aberta contínua (WebSocket/GPS mandando posição a
-  cada segundo) — é carga constante e conexão longa;
-- **otimização de rotas** pesada ou relatórios que podem passar de 15 minutos;
-- algo que precisa de **estado em memória** entre chamadas (ex.: controle de estoque de bolsas em memória);
-- fluxos críticos que não toleram a latência extra de um **cold start** (uma emergência), a não ser com
-  concorrência provisionada.
+- gerar a guia quando um hospital solicitar bolsas de sangue;
+- avisar o hospital quando a bolsa sair do hemocentro;
+- criar o PDF ou QR Code da guia;
+- receber webhooks e validar pedidos.
+
+Como o volume de requisições varia, pagar por execução pode ser mais barato do que manter um servidor ligado.
+
+Não é indicado para:
+
+- rastrear veículos em tempo real, com conexão contínua;
+- executar otimizações de rotas ou relatórios que durem mais de 15 minutos;
+- armazenar informações importantes na memória entre chamadas;
+- processos críticos que não podem sofrer com o cold start, como uma emergência. Nesse último caso, seria
+  necessário usar concorrência provisionada, que mantém ambientes prontos para reduzir esse atraso.
 
 ---
 
