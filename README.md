@@ -10,8 +10,10 @@ Rodada localmente com o **AWS SAM CLI** (emulador do AWS Lambda + API Gateway em
   instalando o SAM CLI com `pip install aws-sam-cli`. Os mesmos comandos funcionam com Docker Desktop no próprio PC.
 - **Provedor emulado:** AWS (Lambda + API Gateway).
 - **Linguagem:** Python 3.12.
-- **Vídeo (2min55s):** [`video/Serverless_RotaVital_video_legendado.mp4`](video/Serverless_RotaVital_video_legendado.mp4)
-  (clique em *View raw* para baixar e assistir). Link no YouTube: `COLE AQUI O LINK DO YOUTUBE (opcional)`
+- **Vídeo (gravação de tela):** https://youtu.be/dx7wEBCqURE
+  (invocação com evento, chamadas HTTP com e sem warm containers e erro de tempo limite).
+- **Vídeo complementar:** [`video/Serverless_RotaVital_video_legendado.mp4`](video/Serverless_RotaVital_video_legendado.mp4),
+  resumo legendado montado a partir dos prints de `evidencias/` (clique em *View raw* para baixar).
 
 ---
 
@@ -30,7 +32,7 @@ Serverless/
 ├── scripts/chamadas.sh        # Faz as 3 chamadas curl do Passo 4
 ├── tests/test_app.py          # Testes unitários do handler (pytest, sem Docker)
 ├── evidencias/                # Prints dos comandos e saídas
-├── video/                     # Vídeo da atividade (até 3 min)
+├── video/                     # Vídeo complementar legendado (o principal está no YouTube)
 └── ROTEIRO_VIDEO.md           # Roteiro do vídeo de 3 minutos
 ```
 
@@ -328,7 +330,8 @@ Declaração conforme a PO-CESAR-021.
   - escrever os testes unitários;
   - redigir o README (passo a passo e rascunho das respostas);
   - me orientar passo a passo na execução pelo Google Cloud Shell;
-  - montar o vídeo a partir dos meus prints, com legendas explicativas.
+  - montar o vídeo complementar legendado a partir dos meus prints e preparar o roteiro de fala
+    da gravação. A gravação de tela do YouTube foi feita por mim.
 - **Como validei:**
   - executei eu mesmo, no Google Cloud Shell, todos os comandos dos Passos 1 a 5 (prints em `evidencias/`);
   - conferi as respostas da função, os tempos e o comportamento do contador e do timeout;
