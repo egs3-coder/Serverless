@@ -1,11 +1,13 @@
 # Roteiro do vídeo (até 3 minutos)
 
-> O vídeo entregue está em [`video/Serverless_RotaVital_video_legendado.mp4`](video/Serverless_RotaVital_video_legendado.mp4):
+> **Vídeo entregue (gravação de tela):** https://youtu.be/dx7wEBCqURE
+>
+> Há também um vídeo complementar em [`video/Serverless_RotaVital_video_legendado.mp4`](video/Serverless_RotaVital_video_legendado.mp4):
 > 2min55s, sem áudio, com legendas, montado a partir dos prints de `evidencias/`. Ordem das cenas: o que a função
 > faz → código → template → evento → versões → build → invocação → start-api → curl sem e com LAZY → gráfico
 > de tempos → timeout 3 s (502) → log do SAM → Timeout 10 (201) → respostas → Rota Vital → custo.
 >
-> O roteiro abaixo serve para quem preferir gravar a tela ao vivo.
+> O roteiro abaixo foi o usado para a gravação de tela.
 
 Grave a tela (Windows: **Win + Alt + R** com a Xbox Game Bar, ou OBS Studio). Deixe o terminal com fonte grande.
 Antes de gravar: Docker Desktop aberto, `sam build` já rodado uma vez (para não perder tempo baixando imagem).
