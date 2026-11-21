@@ -13,3 +13,5 @@ Prints das execuções no Google Cloud Shell, com o AWS SAM CLI emulando o Lambd
 | `08a-timeout-3s.png` | curl com `"demorar": true` e `Timeout: 3`: HTTP 502 em 3,14 s |
 | `08b-timeout-servidor.png` | Log do SAM: `timed out after 3 seconds`, `Duration: 3000.00 ms` |
 | `09-timeout-10s.png` | `Timeout: 10` no template e a mesma chamada respondendo HTTP 201 em 5,04 s |
+| `10a-resposta-400-curl.png` | curl sem `requisicaoId`: HTTP 400 com `{"erro": "requisicaoId obrigatório"}` |
+| `10b-resposta-400-servidor.png` | Log do SAM com as chamadas registradas como `"POST /guias HTTP/1.1" 400` |

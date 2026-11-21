@@ -178,6 +178,8 @@ Ou, por evento: `sam local invoke -e events/pedido_invalido.json`
 
 Resultado: **HTTP 400** com `{"erro": "requisicaoId obrigatório"}`. A guia não é gerada.
 
+![resposta 400](evidencias/10a-resposta-400-curl.png)
+
 ### Passo 5 – Bater no limite de tempo
 
 Com o `start-api` rodando (Timeout = 3 s no `template.yaml`):
@@ -342,6 +344,14 @@ Prints tirados no Google Cloud Shell, na pasta [`evidencias/`](evidencias/)
 **Passo 4 – 3 chamadas curl com `--warm-containers LAZY`** (contador 1, 2, 3)
 
 ![lazy](evidencias/07-curl-warm-lazy.png)
+
+**Passo 4b – pedido sem `requisicaoId`** (HTTP 400 `requisicaoId obrigatório`)
+
+![400 curl](evidencias/10a-resposta-400-curl.png)
+
+**Passo 4b – log do SAM** (as chamadas aparecem como `"POST /guias HTTP/1.1" 400`)
+
+![400 servidor](evidencias/10b-resposta-400-servidor.png)
 
 **Passo 5 – `"demorar": true` com Timeout 3 s** (HTTP 502 em 3,14 s)
 
