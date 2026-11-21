@@ -10,7 +10,7 @@ Rodada localmente com o **AWS SAM CLI** (emulador do AWS Lambda + API Gateway em
   instalando o SAM CLI com `pip install aws-sam-cli`. Os mesmos comandos funcionam com Docker Desktop no próprio PC.
 - **Provedor emulado:** AWS (Lambda + API Gateway).
 - **Linguagem:** Python 3.12.
-- **Vídeo (gravação de tela):** https://youtu.be/dx7wEBCqURE
+- **Vídeo (gravação de tela):** https://youtu.be/hXN19j9MliY
   (invocação com evento, chamadas HTTP com e sem warm containers e erro de tempo limite).
 - **Vídeo complementar:** [`video/Serverless_RotaVital_video_legendado.mp4`](video/Serverless_RotaVital_video_legendado.mp4),
   resumo legendado montado a partir dos prints de `evidencias/` (clique em *View raw* para baixar).
