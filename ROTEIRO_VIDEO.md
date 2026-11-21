@@ -1,23 +1,25 @@
-# Roteiro do vídeo (até 3 minutos)
+# Vídeo da atividade
 
-> **Vídeo entregue (gravação de tela):** https://youtu.be/dx7wEBCqURE
->
-> Há também um vídeo complementar em [`video/Serverless_RotaVital_video_legendado.mp4`](video/Serverless_RotaVital_video_legendado.mp4):
-> 2min55s, sem áudio, com legendas, montado a partir dos prints de `evidencias/`. Ordem das cenas: o que a função
-> faz → código → template → evento → versões → build → invocação → start-api → curl sem e com LAZY → gráfico
-> de tempos → timeout 3 s (502) → log do SAM → Timeout 10 (201) → respostas → Rota Vital → custo.
->
-> O roteiro abaixo foi o usado para a gravação de tela.
+**Gravação de tela:** https://youtu.be/dx7wEBCqURE
 
-Grave a tela (Windows: **Win + Alt + R** com a Xbox Game Bar, ou OBS Studio). Deixe o terminal com fonte grande.
-Antes de gravar: Docker Desktop aberto, `sam build` já rodado uma vez (para não perder tempo baixando imagem).
+Gravado no Google Cloud Shell com dois terminais: um rodando o servidor (`sam local start-api`) e outro
+fazendo as chamadas.
 
-| Tempo | O que mostrar | O que falar (sugestão) |
-|---|---|---|
-| 0:00–0:20 | Repositório no GitHub e o `app.py` | "Essa é a função que gera a guia de transporte do Rota Vital. Ela lê o body, valida o `requisicaoId` e devolve a guia." |
-| 0:20–1:00 | `time sam local invoke -e events/pedido.json` **duas vezes** | "Aqui invoco com o evento no formato do API Gateway. Volta 201 com a guia G-R-001. Notem o tempo de cada execução." |
-| 1:00–1:50 | Terminal 1: `sam local start-api`. Terminal 2: `bash scripts/chamadas.sh` | "Agora por HTTP. Sem warm containers, `invocacaoNesteAmbiente` fica sempre 1." Pare, suba com `--warm-containers LAZY`, rode de novo: "Agora sobe 1, 2, 3, porque o container foi reaproveitado." |
-| 1:50–2:40 | curl com `"demorar":true` → erro. Muda `Timeout: 10`, `sam build`, sobe de novo, repete → 201 | "A função dorme 5 s e o limite é 3 s: estourou o tempo. Aumentando para 10 s, a mesma chamada funciona." |
-| 2:40–3:00 | README com as respostas | "No README estão o passo a passo, as evidências e as respostas. Obrigado." |
+## O que o vídeo mostra, em ordem
 
-Suba o vídeo no YouTube como **Não listado** (ou no Google Drive com acesso "qualquer pessoa com o link") e cole o link no README.
+| # | Terminal | Comando | Resultado |
+|---|---|---|---|
+| 1 | comandos | `time sam local invoke -e events/pedido.json` | HTTP 201 com a guia `G-R-001` e a linha `REPORT` |
+| 2 | servidor | `sam local start-api` | rota `POST /guias` publicada na porta 3000 |
+| 3 | comandos | `bash scripts/chamadas.sh` | `invocacaoNesteAmbiente` 1, 1, 1 (container novo a cada chamada) |
+| 4 | servidor | `sam local start-api --warm-containers LAZY` | servidor reiniciado reaproveitando o container |
+| 5 | comandos | `bash scripts/chamadas.sh` | `invocacaoNesteAmbiente` 1, 2, 3 (container reaproveitado) |
+| 6 | comandos | `curl` sem `requisicaoId` | HTTP 400 `requisicaoId obrigatório` |
+| 7 | comandos | `curl` com `"demorar": true` | HTTP 502 em ~3 s |
+| 8 | servidor | (log) | `timed out after 3 seconds` |
+
+## Vídeo complementar
+
+[`video/Serverless_RotaVital_video_legendado.mp4`](video/Serverless_RotaVital_video_legendado.mp4): resumo
+de 2min55s, sem áudio e com legendas, montado a partir dos prints de `evidencias/`. Cobre também o código, o
+template, o evento, o gráfico de tempos, o ajuste para `Timeout: 10`, a conta de custo e o uso no Rota Vital.
