@@ -165,6 +165,19 @@ E repita as três chamadas.
 | `sam local start-api` | **1, 1, 1** (1,49 s · 0,87 s · 0,83 s) |
 | `sam local start-api --warm-containers LAZY` | **1, 2, 3** (1,08 s · 0,038 s · 0,037 s) |
 
+### Passo 4b – Pedido sem `requisicaoId` (resposta 400)
+
+A função também precisa recusar pedidos inválidos. Com o `start-api` rodando, numa chamada sem `requisicaoId`:
+
+```bash
+curl -X POST http://127.0.0.1:3000/guias -H "Content-Type: application/json" \
+    -d '{"hospital":"H-Recife"}' -w "\n(HTTP %{http_code} em %{time_total}s)\n"
+```
+
+Ou, por evento: `sam local invoke -e events/pedido_invalido.json`
+
+Resultado: **HTTP 400** com `{"erro": "requisicaoId obrigatório"}`. A guia não é gerada.
+
 ### Passo 5 – Bater no limite de tempo
 
 Com o `start-api` rodando (Timeout = 3 s no `template.yaml`):
@@ -211,6 +224,15 @@ Nas chamadas seguintes, o ambiente já está quente e é reutilizado, tornando-a
 `sam local invoke`, cada execução cria um novo container, por isso ambas tiveram tempos semelhantes
 (3,57 s e 3,97 s).
 
+**Por que o emulador local não reproduz o cold start real.** No meu print das invocações, a linha `REPORT`
+mostra `Init Duration: 0.09 ms` e `0.05 ms`, praticamente zero. Ou seja, o emulador quase não mede a fase de
+Init. Os cerca de 3,5 s do tempo `real` são outra coisa: é o Docker criando e subindo o container a cada
+`sam local invoke`, além de montar a pasta do código. Isso não existe desse jeito na nuvem, onde a AWS usa
+microVMs (Firecracker), baixa o pacote da função e inicializa o runtime, e reaproveita o ambiente nas chamadas
+seguintes. Por isso o SAM local serve para ver o comportamento (container novo × reaproveitado, estado, timeout),
+mas não para medir o cold start de verdade. Para isso seria preciso rodar no Lambda real e olhar o
+`Init Duration` nos logs do CloudWatch.
+
 ### 2. O que o campo `invocacaoNesteAmbiente` mostrou com e sem `--warm-containers`? O que isso diz sobre guardar estado numa variável global?
 
 Sem `--warm-containers`, o resultado foi sempre `1`, porque cada requisição criava um novo container e
@@ -233,6 +255,20 @@ foi emitida. Após aumentar o limite para 10 segundos e executar o `sam build` n
 
 O AWS Lambda permite execuções de até 15 minutos. Para tarefas mais longas, pode-se dividi-las em etapas,
 usar Step Functions ou SQS, ou recorrer a serviços como ECS/Fargate e AWS Batch.
+
+**Tempo total ou tempo de CPU?** No Lambda o limite é de **tempo total** (wall-clock): conta o tempo do
+início ao fim da execução, inclusive quando a função está parada esperando. O meu próprio teste mostra isso:
+o `time.sleep(5)` praticamente não usa CPU, e mesmo assim a função foi encerrada aos 3 segundos. A cobrança
+também segue o tempo total (`Billed Duration: 3000 ms` no log).
+
+**Comparação com o Cloudflare Workers.** Lá a lógica é outra: o limite de uma requisição HTTP é de **tempo de
+CPU** (10 ms no plano gratuito; 30 s por padrão no pago, configurável até 5 min). O tempo esperando rede ou banco
+não conta, e não há limite de tempo total enquanto o cliente continua conectado. Se a mesma função com
+`sleep` rodasse no Workers, ela não estouraria o limite, porque dormir não gasta CPU. Já um cálculo pesado
+estouraria muito antes lá do que no Lambda.
+
+**Atualização (19/11/2026):** a AWS anunciou que as *Event Functions* sob demanda podem rodar até 30 minutos;
+as *Web Functions* continuam com 15. O valor de 15 minutos é o da aula e o que vale para uma função web como esta.
 
 ### 4. Quanto custam 1 milhão de execuções com 128 MB e 100 ms?
 
@@ -332,12 +368,14 @@ Declaração conforme a PO-CESAR-021.
   - me orientar passo a passo na execução pelo Google Cloud Shell;
   - montar o vídeo complementar legendado a partir dos meus prints e preparar o roteiro de fala
     da gravação. A gravação de tela do YouTube foi feita por mim.
+  - depois do retorno do professor, redigir os complementos das respostas 1 e 3 (emulador × cold start real,
+    tempo total × tempo de CPU e comparação com o Cloudflare Workers) e organizar o teste da resposta 400.
 - **Como validei:**
   - executei eu mesmo, no Google Cloud Shell, todos os comandos dos Passos 1 a 5 (prints em `evidencias/`);
   - conferi as respostas da função, os tempos e o comportamento do contador e do timeout;
   - rodei `python -m pytest` (5 testes passando) e `sam validate --lint`;
   - refiz a conta de custo à mão;
-  - revisei as respostas com base no material da Aula 007 e na documentação da AWS.
+  - revisei as respostas com base no material da Aula 007 e nas documentações da AWS e da Cloudflare.
   Os números do README e do vídeo são os das minhas execuções.
 
 ## 7. Referências
@@ -345,4 +383,6 @@ Declaração conforme a PO-CESAR-021.
 - Ciclo de vida do ambiente de execução do Lambda: https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtime-environment.html
 - Cotas do Lambda: https://docs.aws.amazon.com/lambda/latest/dg/gettingstarted-limits.html
 - Preços do Lambda: https://aws.amazon.com/lambda/pricing
+- Limites do Cloudflare Workers: https://developers.cloudflare.com/workers/platform/limits/
+- Timeout de 30 minutos para Event Functions (AWS, 19/11/2026): https://aws.amazon.com/blogs/compute/announcing-30-minute-timeout-for-on-demand-aws-lambda-event-functions/
 - SAM CLI – instalação: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html
