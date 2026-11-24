@@ -8,7 +8,7 @@ Função HTTP que recebe uma requisição de bolsas de sangue do Rota Vital e de
 |---|---|
 | **Caminho** | A – AWS SAM CLI local (emula Lambda + API Gateway com Docker) |
 | **Onde rodei** | Google Cloud Shell · SAM CLI 1.171.0 · Docker 29.9.3 · Python 3.12.3 |
-| **Vídeo** | https://youtu.be/hXN19j9MliY (invocação com evento, HTTP com e sem warm containers, resposta 400 e erro de tempo limite) |
+| **Vídeo** | https://youtu.be/hXN19j9MliY (invocação com evento, HTTP com e sem warm containers, resposta 400 e erro de tempo limite · roteiro em [`ROTEIRO_VIDEO.md`](ROTEIRO_VIDEO.md)) |
 
 ## Resumo dos resultados
 
