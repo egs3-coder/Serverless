@@ -2,215 +2,91 @@
 
 Atividade individual 1 (Serverless) · Infraestrutura de Software · ADS · CESAR School · 2026.2
 
-Função HTTP serverless que **recebe uma requisição de bolsas de sangue do Rota Vital e devolve a guia de transporte**.
-Rodada localmente com o **AWS SAM CLI** (emulador do AWS Lambda + API Gateway em Docker).
+Função HTTP que recebe uma requisição de bolsas de sangue do Rota Vital e devolve a guia de transporte.
 
-- **Caminho escolhido:** Caminho A (recomendado) – AWS SAM CLI com emulação local, sem conta na AWS e sem cartão.
-- **Onde rodei:** no **Google Cloud Shell** (terminal Linux gratuito no navegador, que já tem Docker e Python),
-  instalando o SAM CLI com `pip install aws-sam-cli`. Os mesmos comandos funcionam com Docker Desktop no próprio PC.
-- **Provedor emulado:** AWS (Lambda + API Gateway).
-- **Linguagem:** Python 3.12.
-- **Vídeo (gravação de tela):** https://youtu.be/hXN19j9MliY
-  (invocação com evento, chamadas HTTP com e sem warm containers e erro de tempo limite).
-
----
-
-## 1. Estrutura do projeto
-
-```
-Serverless/
-├── template.yaml              # Infra como código (SAM): função, rota POST /guias, Timeout
-├── guia_transporte/
-│   ├── app.py                 # Handler da função (lambda_handler)
-│   └── requirements.txt       # Sem dependências externas
-├── events/
-│   ├── pedido.json            # Evento API Gateway com uma requisição válida
-│   ├── pedido_demorar.json    # Evento com "demorar": true (para estourar o Timeout)
-│   └── pedido_invalido.json   # Evento sem requisicaoId (retorna 400)
-├── scripts/chamadas.sh        # Faz as 3 chamadas curl do Passo 4
-├── tests/test_app.py          # Testes unitários do handler (pytest, sem Docker)
-├── evidencias/                # Prints dos comandos e saídas
-├── video/                     # Vídeo complementar legendado (o principal está no YouTube)
-└── ROTEIRO_VIDEO.md           # Roteiro do vídeo de 3 minutos
-```
-
-## 2. O que a função faz
-
-`POST /guias` com um JSON como:
-
-```json
-{ "requisicaoId": "R-001", "hospital": "H-Recife", "bolsas": ["O-NEG-0142"] }
-```
-
-Resposta **201**:
-
-```json
-{ "guia": "G-R-001", "hospital": "H-Recife", "bolsas": ["O-NEG-0142"], "invocacaoNesteAmbiente": 1 }
-```
-
-| Situação | Status |
+| | |
 |---|---|
-| Pedido válido | `201` com a guia |
-| Sem `requisicaoId` | `400` `{"erro": "requisicaoId obrigatório"}` |
-| Body que não é JSON | `400` `{"erro": "body precisa ser um JSON válido"}` |
-| `"demorar": true` | dorme 5 s → estoura o `Timeout` de 3 s |
+| **Caminho** | A – AWS SAM CLI local (emula Lambda + API Gateway com Docker) |
+| **Onde rodei** | Google Cloud Shell · SAM CLI 1.171.0 · Docker 29.9.3 · Python 3.12.3 |
+| **Vídeo** | https://youtu.be/hXN19j9MliY (invocação com evento, HTTP com e sem warm containers, resposta 400 e erro de tempo limite · roteiro em [`ROTEIRO_VIDEO.md`](ROTEIRO_VIDEO.md)) |
 
-O campo `invocacaoNesteAmbiente` vem de uma **variável global** (`contador`) que só cresce se o mesmo
-ambiente de execução (container) for reaproveitado — é ele que usamos para observar cold start × warm start.
+## Resumo dos resultados
 
-### Diferença em relação ao código do enunciado
+| Item | Resultado | Evidência |
+|---|---|---|
+| Invocação com evento (2×) | HTTP 201, guia `G-R-001` · 3,57 s e 3,97 s | [03](evidencias/03-invoke.png) |
+| HTTP sem `--warm-containers` | contador **1, 1, 1** · 1,49 s / 0,87 s / 0,83 s | [04](evidencias/04-start-api.png) · [05](evidencias/05-curl-sem-warm.png) |
+| HTTP com `--warm-containers LAZY` | contador **1, 2, 3** · 1,08 s / 0,038 s / 0,037 s | [06](evidencias/06-curl-warm-lazy.png) |
+| Pedido sem `requisicaoId` | HTTP **400** `requisicaoId obrigatório` | [07a](evidencias/07a-resposta-400-curl.png) · [07b](evidencias/07b-resposta-400-servidor.png) |
+| `"demorar": true` com `Timeout: 3` | HTTP **502** em 3,14 s · `timed out after 3 seconds` | [08a](evidencias/08a-timeout-3s.png) · [08b](evidencias/08b-timeout-servidor.png) |
+| Mesmo pedido com `Timeout: 10` | HTTP **201** em 5,04 s | [09](evidencias/09-timeout-10s.png) |
 
-Nas versões atuais do SAM CLI (testei com a **1.171.0**), o `sam local generate-event apigateway aws-proxy`
-gera o body **codificado em base64** (`"isBase64Encoded": true`). O código original fazia `json.loads(body)`
-direto e quebrava com `JSONDecodeError`. Por isso o `app.py` decodifica o base64 quando esse campo é `true`.
-Também tratei o caso de body inválido devolvendo `400` em vez de deixar a função dar erro.
+**Ajuste no código do enunciado:** o SAM CLI 1.171 gera o evento com o body em base64 (`"isBase64Encoded": true`),
+e o `json.loads(body)` original quebrava com `JSONDecodeError`. O [`app.py`](guia_transporte/app.py) decodifica o
+base64 antes de ler o JSON e devolve 400 se o body não for JSON válido.
 
----
+## 1. Arquivos
 
-## 3. Como rodar (passo a passo)
+| Arquivo | Conteúdo |
+|---|---|
+| [`template.yaml`](template.yaml) | Função, rota `POST /guias`, `Timeout: 3`, 128 MB |
+| [`guia_transporte/app.py`](guia_transporte/app.py) | Handler (`lambda_handler`) |
+| [`events/`](events/) | Eventos do API Gateway: `pedido.json`, `pedido_invalido.json` (400), `pedido_demorar.json` |
+| [`scripts/chamadas.sh`](scripts/chamadas.sh) | As 3 chamadas `curl` do Passo 4 |
+| [`tests/test_app.py`](tests/test_app.py) | 5 testes do handler (`python -m pytest -q`) |
 
-> **Windows:** rode todos os comandos no **Git Bash** (ou WSL), como pede o enunciado.
->
-> **Sem instalar nada:** abra https://shell.cloud.google.com (com um Gmail pessoal), rode
-> `pip install aws-sam-cli` e use `sam build --use-container` no lugar de `sam build`.
+## 2. Como rodar
 
-### Passo 1 – Instalar as ferramentas
+Pré-requisitos: [Docker](https://docs.docker.com/get-started/get-docker), [AWS SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html)
+e Python 3.12. No Windows, use Git Bash ou WSL. Sem instalar nada: no [Google Cloud Shell](https://shell.cloud.google.com),
+rode `pip install aws-sam-cli` e use `sam build --use-container`.
 
-1. **Docker Desktop**: https://docs.docker.com/get-started/get-docker – abra o Docker Desktop e espere ficar "Running".
-2. **AWS SAM CLI**: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html
-   (no Windows é um instalador `.msi`; feche e abra o terminal depois).
-3. **Python 3.12**: https://www.python.org/downloads/
-4. Conferir:
+Projeto criado com `sam init` (Hello World, Python 3.12, zip): rota trocada de `GET /hello` para `POST /guias` e
+pasta `hello_world` renomeada para `guia_transporte`.
 
-```bash
-sam --version
-docker --version
-python --version
-```
-
-> Não precisa de conta AWS para rodar local. Se o SAM pedir credenciais, rode `aws configure` com valores falsos
-> (ex.: `AKIAFAKE` / `fake` / região `us-east-1`) ou apenas ignore o aviso.
-
-### Passo 2 – Baixar o projeto e fazer o build
+**Passo 2 – build**
 
 ```bash
-git clone https://github.com/egs3-coder/Serverless.git
-cd Serverless
+git clone https://github.com/egs3-coder/Serverless.git && cd Serverless
 sam build
 ```
 
-Deve terminar com **Build Succeeded**.
-
-*(Como o projeto foi criado: `sam init` → AWS Quick Start Templates → Hello World Example → Python 3.12 → zip.
-Depois troquei o caminho `/hello` por `/guias`, o método `get` por `post`, renomeei a pasta `hello_world` para
-`guia_transporte` e substituí o `app.py`.)*
-
-### Passo 3 – Invocar a função com um evento
-
-Os eventos já estão em `events/`. Eles foram gerados assim:
-
-```bash
-sam local generate-event apigateway aws-proxy --method POST --path guias \
-    --body '{"requisicaoId":"R-001","hospital":"H-Recife","bolsas":["O-NEG-0142"]}' \
-    > events/pedido.json
-```
-
-Invocar **duas vezes**, medindo o tempo:
+**Passo 3 – invocar com evento (2 vezes)**
 
 ```bash
 time sam local invoke -e events/pedido.json
-time sam local invoke -e events/pedido.json
 ```
 
-Na saída aparece o `statusCode: 201`, o body com a guia, uma linha `REPORT ... Duration: ... ms` e,
-no fim, o tempo `real` do comando.
+O evento foi gerado com
+`sam local generate-event apigateway aws-proxy --method POST --path guias --body '{"requisicaoId":"R-001","hospital":"H-Recife","bolsas":["O-NEG-0142"]}'`.
 
-| Invocação | Tempo `real` | `Duration` (REPORT) | `Init Duration` |
-|---|---|---|---|
-| 1ª | 3,573 s | 73,04 ms | 0,09 ms |
-| 2ª | 3,973 s | 70,91 ms | 0,05 ms |
-
-As duas responderam `201` com a guia `G-R-001`. A linha `[ERROR] ... LAMBDA_RUNTIME Failed to get next invocation`
-que aparece no fim é o runtime reclamando depois que o SAM já desligou o container; não afeta a resposta.
-
-### Passo 4 – Acionar por HTTP
-
-**Terminal 1:**
+**Passo 4 – HTTP** (terminal 1 = servidor, terminal 2 = chamadas)
 
 ```bash
+# terminal 1
 sam local start-api
-```
-
-**Terminal 2** (três chamadas):
-
-```bash
+# terminal 2
 bash scripts/chamadas.sh
-# ou manualmente, 3 vezes:
-curl -X POST http://127.0.0.1:3000/guias -H "Content-Type: application/json" \
-    -d '{"requisicaoId":"R-002","hospital":"H-Caruaru"}'
-```
 
-Depois pare o servidor (**Ctrl + C**) e suba de novo reaproveitando containers:
-
-```bash
+# terminal 1: Ctrl + C e depois
 sam local start-api --warm-containers LAZY
+# terminal 2
+bash scripts/chamadas.sh
+
+# terminal 2: pedido sem requisicaoId → 400
+curl -X POST http://127.0.0.1:3000/guias -H "Content-Type: application/json" -d '{"hospital":"H-Recife"}'
 ```
 
-E repita as três chamadas.
-
-| Modo | `invocacaoNesteAmbiente` nas 3 chamadas |
-|---|---|
-| `sam local start-api` | **1, 1, 1** (1,49 s · 0,87 s · 0,83 s) |
-| `sam local start-api --warm-containers LAZY` | **1, 2, 3** (1,08 s · 0,038 s · 0,037 s) |
-
-### Passo 4b – Pedido sem `requisicaoId` (resposta 400)
-
-A função também precisa recusar pedidos inválidos. Com o `start-api` rodando, numa chamada sem `requisicaoId`:
+**Passo 5 – limite de tempo**
 
 ```bash
-curl -X POST http://127.0.0.1:3000/guias -H "Content-Type: application/json" \
-    -d '{"hospital":"H-Recife"}' -w "\n(HTTP %{http_code} em %{time_total}s)\n"
+# terminal 2, com Timeout: 3 → 502
+curl -X POST http://127.0.0.1:3000/guias -H "Content-Type: application/json" -d '{"requisicaoId":"R-003","demorar":true}'
+
+# trocar para Timeout: 10 no template.yaml, rodar sam build, subir o start-api e repetir o curl → 201
 ```
 
-Ou, por evento: `sam local invoke -e events/pedido_invalido.json`
-
-Resultado: **HTTP 400** com `{"erro": "requisicaoId obrigatório"}`. A guia não é gerada.
-
-### Passo 5 – Bater no limite de tempo
-
-Com o `start-api` rodando (Timeout = 3 s no `template.yaml`):
-
-```bash
-curl -X POST http://127.0.0.1:3000/guias -H "Content-Type: application/json" \
-    -d '{"requisicaoId":"R-003","demorar":true}'
-```
-
-Ou por evento: `sam local invoke -e events/pedido_demorar.json`
-
-**Erro registrado:** o curl recebeu `{"message":"Internal server error"}` com **HTTP 502 em 3,14 s**, e o
-terminal do SAM mostrou `Function 'GuiaTransporteFunction' timed out after 3 seconds`
-(`REPORT ... Duration: 3000.00 ms  Billed Duration: 3000 ms`).
-
-**Depois do ajuste para 10 s:** a mesma chamada voltou **HTTP 201** com a guia `G-R-003` em **5,04 s**.
-
-Ajuste: no `template.yaml`, em `Globals > Function`, trocar `Timeout: 3` por `Timeout: 10`, e então:
-
-```bash
-sam build
-sam local start-api
-# repetir o curl com "demorar": true  → agora volta 201 depois de ~5 s
-```
-
-### Extra – testes unitários (sem Docker)
-
-```bash
-pip install pytest
-python -m pytest -q
-```
-
----
-
-## 4. Respostas
+## 3. Respostas
 
 ### 1. Por que a primeira invocação demorou mais que a segunda? O que acontece na fase de Init?
 
@@ -310,77 +186,74 @@ Não é indicado para:
 - processos críticos que não podem sofrer com o cold start, como uma emergência. Nesse último caso, seria
   necessário usar concorrência provisionada, que mantém ambientes prontos para reduzir esse atraso.
 
----
+## 4. Evidências
 
-## 5. Evidências
+Prints do Google Cloud Shell, em ordem de execução. A lista também está em [`evidencias/README.md`](evidencias/README.md).
 
-Prints tirados no Google Cloud Shell, na pasta [`evidencias/`](evidencias/)
-(descrição de cada um em [`evidencias/README.md`](evidencias/README.md)).
+**01 – ferramentas instaladas**
 
-**Passo 1 – ferramentas instaladas** (SAM CLI 1.171.0, Docker 29.9.3, Python 3.12.3)
+![01](evidencias/01-versoes.png)
 
-![versões](evidencias/01-versoes.png)
+**02 – `sam build`** (Build Succeeded)
 
-**Passo 2 – `sam build --use-container`** (Build Succeeded)
+![02](evidencias/02-sam-build.png)
 
-![build](evidencias/02-sam-build.png)
+**03 – duas invocações com evento** (201, linha `REPORT` e tempo `real`)
 
-**Passo 3 – duas invocações com evento** (`statusCode: 201`, linha `REPORT` e tempo `real` de cada uma)
+![03](evidencias/03-invoke.png)
 
-![invoke](evidencias/03-04-invoke.png)
+**04 – `sam local start-api`** (rota `POST /guias`)
 
-**Passo 4 – `sam local start-api`** (rota `POST /guias`)
+![04](evidencias/04-start-api.png)
 
-![start-api](evidencias/05-start-api.png)
+**05 – 3 chamadas sem `--warm-containers`** (contador 1, 1, 1)
 
-**Passo 4 – 3 chamadas curl sem `--warm-containers`** (contador 1, 1, 1)
+![05](evidencias/05-curl-sem-warm.png)
 
-![sem warm](evidencias/06-curl-sem-warm.png)
+**06 – 3 chamadas com `--warm-containers LAZY`** (contador 1, 2, 3)
 
-**Passo 4 – 3 chamadas curl com `--warm-containers LAZY`** (contador 1, 2, 3)
+![06](evidencias/06-curl-warm-lazy.png)
 
-![lazy](evidencias/07-curl-warm-lazy.png)
+**07a – pedido sem `requisicaoId`** (HTTP 400)
 
-**Passo 5 – `"demorar": true` com Timeout 3 s** (HTTP 502 em 3,14 s)
+![07a](evidencias/07a-resposta-400-curl.png)
 
-![timeout cliente](evidencias/08a-timeout-3s.png)
+**07b – log do SAM** (`"POST /guias HTTP/1.1" 400`)
 
-**Passo 5 – log do SAM** (`timed out after 3 seconds`, `Duration: 3000.00 ms`)
+![07b](evidencias/07b-resposta-400-servidor.png)
 
-![timeout servidor](evidencias/08b-timeout-servidor.png)
+**08a – `"demorar": true` com `Timeout: 3`** (HTTP 502 em 3,14 s)
 
-**Passo 5 – depois do ajuste para `Timeout: 10`** (HTTP 201 em 5,04 s)
+![08a](evidencias/08a-timeout-3s.png)
 
-![timeout 10](evidencias/09-timeout-10s.png)
+**08b – log do SAM** (`timed out after 3 seconds`, `Duration: 3000.00 ms`)
 
-## 6. Uso de IA
+![08b](evidencias/08b-timeout-servidor.png)
+
+**09 – com `Timeout: 10`** (HTTP 201 em 5,04 s)
+
+![09](evidencias/09-timeout-10s.png)
+
+## 5. Uso de IA
 
 Declaração conforme a PO-CESAR-021.
 
 - **Ferramenta:** Claude (Anthropic).
-- **Finalidade:**
-  - montar a estrutura do projeto SAM (`template.yaml`, eventos, script de chamadas) e ajustar o handler
-    para ler o body em base64, que o `sam local generate-event` gera nas versões novas do SAM CLI;
-  - escrever os testes unitários;
-  - redigir o README (passo a passo e rascunho das respostas);
-  - me orientar passo a passo na execução pelo Google Cloud Shell;
-  - montar o vídeo complementar legendado a partir dos meus prints e preparar o roteiro de fala
-    da gravação. A gravação de tela do YouTube foi feita por mim.
-  - depois do retorno do professor, redigir os complementos das respostas 1 e 3 (emulador × cold start real,
-    tempo total × tempo de CPU e comparação com o Cloudflare Workers) e organizar o teste da resposta 400.
-- **Como validei:**
-  - executei eu mesmo, no Google Cloud Shell, todos os comandos dos Passos 1 a 5 (prints em `evidencias/`);
-  - conferi as respostas da função, os tempos e o comportamento do contador e do timeout;
-  - rodei `python -m pytest` (5 testes passando) e `sam validate --lint`;
-  - refiz a conta de custo à mão;
-  - revisei as respostas com base no material da Aula 007 e nas documentações da AWS e da Cloudflare.
-  Os números do README e do vídeo são os das minhas execuções.
+- **Finalidade:** montar a estrutura do projeto SAM (template, eventos, script de chamadas e testes); ajustar o
+  handler para ler o body em base64; redigir o README e o rascunho das respostas; me orientar na execução pelo
+  Google Cloud Shell e no roteiro de fala do vídeo; depois do retorno do professor, redigir os complementos das
+  respostas 1 e 3 (emulador × cold start real, tempo total × CPU, comparação com o Cloudflare Workers) e
+  organizar o teste da resposta 400.
+- **Como validei:** executei eu mesmo todos os comandos no Google Cloud Shell (prints em `evidencias/`) e gravei
+  o vídeo; conferi as respostas da função, os tempos, o contador e o timeout; rodei `python -m pytest`
+  (5 testes passando) e `sam validate --lint`; refiz a conta de custo à mão; reescrevi as respostas com as minhas
+  palavras e revisei os complementos com o material da Aula 007 e as documentações da AWS e da Cloudflare.
+  Todos os números são das minhas execuções.
 
-## 7. Referências
+## 6. Referências
 
 - Ciclo de vida do ambiente de execução do Lambda: https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtime-environment.html
 - Cotas do Lambda: https://docs.aws.amazon.com/lambda/latest/dg/gettingstarted-limits.html
 - Preços do Lambda: https://aws.amazon.com/lambda/pricing
 - Limites do Cloudflare Workers: https://developers.cloudflare.com/workers/platform/limits/
 - Timeout de 30 minutos para Event Functions (AWS, 19/11/2026): https://aws.amazon.com/blogs/compute/announcing-30-minute-timeout-for-on-demand-aws-lambda-event-functions/
-- SAM CLI – instalação: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html
